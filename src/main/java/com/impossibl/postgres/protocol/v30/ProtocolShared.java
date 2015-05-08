@@ -39,12 +39,24 @@ import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.oio.OioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.util.ThreadDeathWatcher;
 import io.netty.util.concurrent.Future;
 
 public class ProtocolShared {
+
+  private static boolean nio = true;
+
+  static {
+    String transport = System.getProperty("pgjdbc-ng.transport");
+    if (transport != null) {
+      if ("oio".equals(transport))
+        nio = false;
+    }
+  }
 
   public class Ref {
 
@@ -97,16 +109,29 @@ public class ProtocolShared {
   }
 
   private void init() {
-    int workerCount = getRuntime().availableProcessors();
-    NioEventLoopGroup group = new NioEventLoopGroup(workerCount, new NamedThreadFactory("PG-JDBC EventLoop"));
-
     bootstrap = new Bootstrap();
-    bootstrap.group(group).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
-      @Override
-      protected void initChannel(SocketChannel ch) throws Exception {
-        ch.pipeline().addLast(new MessageDecoder(), new MessageHandler());
-      }
-    }).option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+
+    if (nio) {
+      NioEventLoopGroup group = new NioEventLoopGroup(getRuntime().availableProcessors(),
+                                                      new NamedThreadFactory("PG-JDBC EventLoop"));
+      bootstrap.group(group).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
+        @Override
+        protected void initChannel(SocketChannel ch) throws Exception {
+          ch.pipeline().addLast(new MessageDecoder(), new MessageHandler());
+        }
+      }).option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+    }
+    else {
+      OioEventLoopGroup group = new OioEventLoopGroup(0,
+                                                      new NamedThreadFactory("PG-JDBC EventLoop"));
+      bootstrap.group(group).channel(OioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
+        @Override
+        protected void initChannel(SocketChannel ch) throws Exception {
+          ch.pipeline().addLast(new MessageDecoder(), new MessageHandler());
+        }
+      }).option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+        .option(ChannelOption.SO_TIMEOUT, 10);
+    }
   }
 
   public Future<?> shutdown() {
