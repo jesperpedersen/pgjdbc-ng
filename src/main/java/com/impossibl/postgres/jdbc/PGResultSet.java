@@ -2292,7 +2292,7 @@ class CursorScroller extends Scroller {
       throw new SQLException("Invalid update row");
     }
 
-    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId);
+    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId, connection);
 
     StringBuilder sb = new StringBuilder("INSERT INTO ");
 
@@ -2325,7 +2325,7 @@ class CursorScroller extends Scroller {
       throw new SQLException("Invalid update row");
     }
 
-    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId);
+    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId, connection);
 
     StringBuilder sb = new StringBuilder("UPDATE ");
 
@@ -2356,7 +2356,7 @@ class CursorScroller extends Scroller {
     if (!isValidRow())
       throw ROW_INDEX_OUT_OF_BOUNDS;
 
-    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId);
+    Type relType = connection.getRegistry().loadRelationType(resultFields.get(0).relationId, connection);
 
     StringBuilder sb = new StringBuilder();
     sb.append("DELETE FROM ").append('"').append(relType.getName()).append('"').append(" WHERE CURRENT OF ").append(cursorName);

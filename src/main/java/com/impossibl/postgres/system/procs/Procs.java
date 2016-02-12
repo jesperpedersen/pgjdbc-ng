@@ -34,6 +34,8 @@ import com.impossibl.postgres.types.Modifiers;
 import com.impossibl.postgres.types.Type;
 import com.impossibl.postgres.types.Type.Codec;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.ServiceLoader;
 
 
@@ -93,14 +95,23 @@ public class Procs {
   private static final Type.Codec.Encoder[] DEFAULT_ENCODERS = {new Unknowns.TxtEncoder(), new Unknowns.BinEncoder()};
   private static final Modifiers.Parser DEFAULT_MOD_PARSER = new Unknowns.ModParser();
 
-  private ServiceLoader<ProcProvider> providers;
+  private Collection<ProcProvider> providers;
 
   public Procs(ClassLoader classLoader) {
+    providers = new ArrayList<ProcProvider>();
+
+    ServiceLoader<ProcProvider> p = null;
     try {
-      providers = ServiceLoader.load(ProcProvider.class, classLoader);
+      p = ServiceLoader.load(ProcProvider.class, classLoader);
     }
     catch (Exception e) {
-      providers = ServiceLoader.load(ProcProvider.class, Procs.class.getClassLoader());
+      p = ServiceLoader.load(ProcProvider.class, Procs.class.getClassLoader());
+    }
+
+    if (p != null) {
+      for (ProcProvider pp : p) {
+        providers.add(pp);
+      }
     }
   }
 

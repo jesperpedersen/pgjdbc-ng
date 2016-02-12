@@ -102,6 +102,7 @@ public class BasicContext implements Context {
   }
 
 
+  protected String identifier;
   protected Registry registry;
   protected Map<String, Class<?>> targetTypeMap;
   protected Charset charset;
@@ -118,6 +119,7 @@ public class BasicContext implements Context {
 
 
   public BasicContext(SocketAddress address, Properties settings, Map<String, Class<?>> targetTypeMap) throws IOException, NoticeException {
+    this.identifier = settings.toString();
     this.targetTypeMap = new HashMap<>(targetTypeMap);
     this.settings = settings;
     this.charset = UTF_8;
@@ -126,13 +128,14 @@ public class BasicContext implements Context {
     this.timeFormatter = new ISOTimeFormat();
     this.timestampFormatter = new ISOTimestampFormat();
     this.notificationListeners = new ConcurrentHashMap<>();
-    this.registry = new Registry(this);
+    this.registry = Registry.register(identifier, this);
     this.protocol = new ProtocolFactoryImpl().connect(address, this);
     this.utilQueries = new HashMap<>();
   }
 
   protected void shutdown() {
     protocol.shutdown();
+    Registry.unregister(identifier);
   }
 
   public Version getServerVersion() {
@@ -265,7 +268,7 @@ public class BasicContext implements Context {
     logger.fine("query time: " + timer.getLap() + "ms");
 
     //Update the registry with known types
-    registry.update(pgTypes, pgAttrs, pgProcs);
+    registry.update(pgTypes, pgAttrs, pgProcs, this);
 
     logger.fine("load time: " + timer.getLap() + "ms");
   }
@@ -313,7 +316,7 @@ public class BasicContext implements Context {
       //Load attributes
       List<PgAttribute.Row> pgAttrs = queryResults("@refresh-type-attrs", PgAttribute.Row.class, pgTypes.get(0).relationId);
 
-      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList());
+      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList(), this);
     }
     catch (IOException | NoticeException e) {
       //Ignore errors
@@ -339,7 +342,7 @@ public class BasicContext implements Context {
       //Load attributes
       List<PgAttribute.Row> pgAttrs = queryResults("@refresh-types-attrs", PgAttribute.Row.class, (Object) typeIds);
 
-      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList());
+      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList(), this);
     }
     catch (IOException | NoticeException e) {
       logger.log(WARNING, "Error refreshing types", e);
@@ -362,7 +365,7 @@ public class BasicContext implements Context {
       //Load attributes
       List<PgAttribute.Row> pgAttrs = queryResults("@refresh-type-attrs", PgAttribute.Row.class, relationId);
 
-      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList());
+      registry.update(pgTypes, pgAttrs, Collections.<PgProc.Row>emptyList(), this);
     }
     catch (IOException | NoticeException e) {
       //Ignore errors
@@ -378,7 +381,7 @@ public class BasicContext implements Context {
 
     List<Type> parameterTypes = new ArrayList<>(parameterTypeNames.length);
     for (String parameterTypeName : parameterTypeNames) {
-      parameterTypes.add(registry.loadType(parameterTypeName));
+      parameterTypes.add(registry.loadType(parameterTypeName, this));
     }
 
     return prepareUtilQuery(name, sql, parameterTypes);

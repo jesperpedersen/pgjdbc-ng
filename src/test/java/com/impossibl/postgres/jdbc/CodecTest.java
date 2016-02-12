@@ -120,7 +120,7 @@ public class CodecTest {
       return;
     }
 
-    Type type = conn.getRegistry().loadType(typeName);
+    Type type = conn.getRegistry().loadType(typeName, conn);
     if (type == null) {
       System.out.println("Skipping " + typeName + " unknown (bin)");
       return;
@@ -144,7 +144,7 @@ public class CodecTest {
       return;
     }
 
-    Type type = conn.getRegistry().loadType(typeName);
+    Type type = conn.getRegistry().loadType(typeName, conn);
     if (type == null) {
       System.out.println("Skipping " + typeName + " unknown (txt)");
       return;
@@ -168,7 +168,7 @@ public class CodecTest {
       return;
     }
 
-    Type type = conn.getRegistry().loadType(typeName);
+    Type type = conn.getRegistry().loadType(typeName, conn);
     if (type == null) {
       System.out.println("Skipping " + typeName + " unknown (binlen)");
       return;
@@ -375,7 +375,7 @@ public class CodecTest {
 
         @Override
         public Object make(PGConnectionImpl conn) throws SQLException {
-          if (conn.getRegistry().loadType("int4range") == null) {
+          if (conn.getRegistry().loadType("int4range", conn) == null) {
             throw new SQLFeatureNotSupportedException();
           }
           return Range.create(0, true, 5, false);

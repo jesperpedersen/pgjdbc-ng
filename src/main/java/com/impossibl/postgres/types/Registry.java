@@ -56,6 +56,9 @@ public class Registry {
 
   private static Logger logger = Logger.getLogger(Registry.class.getName());
 
+  private static HashMap<String, Registry> registries = new HashMap<String, Registry>();
+  private static HashMap<String, Integer> refCount = new HashMap<String, Integer>();
+
   private Map<Character, Class<? extends Type>> kindMap;
   private TreeMap<Integer, Type> oidMap;
   private Map<String, Type> nameMap;
@@ -66,18 +69,46 @@ public class Registry {
   private TreeMap<Integer, PgProc.Row> pgProcData;
   private Map<String, PgProc.Row> pgProcNameMap;
 
-  private Context context;
   private Procs procs;
-  private ReadWriteLock lock = new ReentrantReadWriteLock();
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   private Map<String, String> typeNameAliases;
 
+  public static synchronized Registry register(String id, Context context) {
+    Registry registry = registries.get(id);
 
-  public Registry(Context context) {
+    if (registry == null) {
+      registry = new Registry(context);
 
-    this.context = context;
+      registries.put(id, registry);
+      refCount.put(id, Integer.valueOf(1));
+    }
+    else {
+      Integer i = refCount.get(id);
+      refCount.put(id, Integer.valueOf(i.intValue() + 1));
+    }
 
-    this.procs = new Procs(context.getClass().getClassLoader());
+    return registry;
+  }
+
+  public static synchronized void unregister(String id) {
+    Integer i = refCount.get(id);
+
+    if (i != null) {
+      int newCount = i.intValue() - 1;
+
+      if (newCount == 0) {
+        registries.remove(id);
+        refCount.remove(id);
+      }
+      else {
+        refCount.put(id, Integer.valueOf(newCount));
+      }
+    }
+  }
+
+  private Registry(Context context) {
+    procs = new Procs(context.getClass().getClassLoader());
 
     pgTypeData = new TreeMap<>();
     pgAttrData = new TreeMap<>();
@@ -123,9 +154,10 @@ public class Registry {
    * Loads a type by its type-id (aka OID)
    *
    * @param typeId The type's id
+   * @param context The context
    * @return Type object or null, if none found
    */
-  public Type loadType(int typeId) {
+  public Type loadType(int typeId, Context context) {
 
     if (typeId == 0)
       return null;
@@ -137,9 +169,10 @@ public class Registry {
       if (type == null) {
 
         lock.readLock().unlock();
+        lock.writeLock().lock();
         try {
 
-          type = loadRaw(typeId);
+          type = loadRaw(typeId, context);
 
           if (type == null) {
 
@@ -147,9 +180,10 @@ public class Registry {
 
           }
 
+          lock.readLock().lock();
         }
         finally {
-          lock.readLock().lock();
+          lock.writeLock().unlock();
         }
 
         type = oidMap.get(typeId);
@@ -169,9 +203,10 @@ public class Registry {
    * Loads a type by its name
    *
    * @param name The type's name
+   * @parma context The context
    * @return Type object or null, if none found
    */
-  public Type loadType(String name) {
+  public Type loadType(String name, Context context) {
 
     boolean isArray = false;
     if (name .endsWith("[]")) {
@@ -197,8 +232,10 @@ public class Registry {
     }
 
     if (res == null) {
+      lock.writeLock().lock();
       context.refreshType(getLatestKnownTypeId() + 1);
       lock.readLock().lock();
+      lock.writeLock().unlock();
       try {
         res = nameMap.get(name);
       }
@@ -208,7 +245,7 @@ public class Registry {
     }
 
     if (isArray && res != null) {
-      res = loadType(res.getArrayTypeId());
+      res = loadType(res.getArrayTypeId(), context);
     }
 
     return res;
@@ -218,9 +255,10 @@ public class Registry {
    * Loads a relation (aka table) type by its relation-id
    *
    * @param relationId Relation ID of the type to load
+   * @param context The context
    * @return Relation type or null
    */
-  public CompositeType loadRelationType(int relationId) {
+  public CompositeType loadRelationType(int relationId, Context context) {
 
     if (relationId == 0)
       return null;
@@ -232,9 +270,10 @@ public class Registry {
       if (type == null) {
 
         lock.readLock().unlock();
+        lock.writeLock().lock();
         try {
 
-          type = loadRelationRaw(relationId);
+          type = loadRelationRaw(relationId, context);
 
           if (type == null) {
 
@@ -242,9 +281,10 @@ public class Registry {
 
           }
 
+          lock.readLock().lock();
         }
         finally {
-          lock.readLock().lock();
+          lock.writeLock().unlock();
         }
 
         type = (CompositeType) relIdMap.get(relationId);
@@ -327,163 +367,129 @@ public class Registry {
    * information not specifically mentioned in the given updated
    * data will be retained and untouched.
    *
+   * This method MUST be called with a WRITE lock
    * @param pgTypeRows "pg_type" table rows
    * @param pgAttrRows "pg_attribute" table rows
    * @param pgProcRows "pg_proc" table rows
+   * @param context    the context
    */
-  public void update(Collection<PgType.Row> pgTypeRows, Collection<PgAttribute.Row> pgAttrRows, Collection<PgProc.Row> pgProcRows) {
+  public void update(Collection<PgType.Row> pgTypeRows, Collection<PgAttribute.Row> pgAttrRows, Collection<PgProc.Row> pgProcRows, Context context) {
+    /*
+     * Update attribute info
+     */
 
-    lock.writeLock().lock();
-    try {
-      /*
-       * Update attribute info
-       */
-
-      //Remove attribute info for updating types
-      for (PgType.Row pgType : pgTypeRows) {
-        pgAttrData.remove(pgType.relationId);
-      }
-
-      //Add updated info
-      for (PgAttribute.Row pgAttrRow : pgAttrRows) {
-
-        Collection<PgAttribute.Row> relRows = pgAttrData.get(pgAttrRow.relationId);
-        if (relRows == null) {
-          relRows = new HashSet<PgAttribute.Row>();
-          pgAttrData.put(pgAttrRow.relationId, relRows);
-        }
-
-        relRows.add(pgAttrRow);
-      }
-
-      /*
-       * Update proc info
-       */
-
-      for (PgProc.Row pgProcRow : pgProcRows) {
-        pgProcData.put(pgProcRow.oid, pgProcRow);
-        pgProcNameMap.put(pgProcRow.name, pgProcRow);
-      }
-
-
-      /*
-       * Update type info
-       */
-      for (PgType.Row pgTypeRow : pgTypeRows) {
-        pgTypeData.put(pgTypeRow.oid, pgTypeRow);
-        oidMap.remove(pgTypeRow.oid);
-        nameMap.remove(pgTypeRow.name);
-        relIdMap.remove(pgTypeRow.relationId);
-      }
-
+    //Remove attribute info for updating types
+    for (PgType.Row pgType : pgTypeRows) {
+      pgAttrData.remove(pgType.relationId);
     }
-    finally {
-      lock.writeLock().unlock();
+
+    //Add updated info
+    for (PgAttribute.Row pgAttrRow : pgAttrRows) {
+
+      Collection<PgAttribute.Row> relRows = pgAttrData.get(pgAttrRow.relationId);
+      if (relRows == null) {
+        relRows = new HashSet<PgAttribute.Row>();
+        pgAttrData.put(pgAttrRow.relationId, relRows);
+      }
+
+      relRows.add(pgAttrRow);
+    }
+
+    /*
+     * Update proc info
+     */
+    for (PgProc.Row pgProcRow : pgProcRows) {
+      pgProcData.put(pgProcRow.oid, pgProcRow);
+      pgProcNameMap.put(pgProcRow.name, pgProcRow);
+    }
+
+    /*
+     * Update type info
+     */
+    for (PgType.Row pgTypeRow : pgTypeRows) {
+      pgTypeData.put(pgTypeRow.oid, pgTypeRow);
+      oidMap.remove(pgTypeRow.oid);
+      nameMap.remove(pgTypeRow.name);
+      relIdMap.remove(pgTypeRow.relationId);
     }
 
     /*
      * (re)load all types just updated
      */
     for (PgType.Row pgType : pgTypeRows) {
-      loadType(pgType.oid);
+      loadType(pgType.oid, context);
     }
-
   }
 
   /*
    * Materialize the requested type from the raw catalog data
+   *
+   * This method MUST be called with a WRITE lock
    */
-  private Type loadRaw(int typeId) {
+  private Type loadRaw(int typeId, Context context) {
 
     if (typeId == 0)
       return null;
 
-    lock.writeLock().lock();
-    try {
+    PgType.Row pgType = pgTypeData.get(typeId);
+    if (pgType == null)
+      return null;
 
-      PgType.Row pgType = pgTypeData.get(typeId);
-      if (pgType == null)
-        return null;
+    Collection<PgAttribute.Row> pgAttrs = pgAttrData.get(pgType.relationId);
 
-      Collection<PgAttribute.Row> pgAttrs = pgAttrData.get(pgType.relationId);
+    Type type = loadRaw(pgType, pgAttrs, context);
 
-      Type type;
-
-      lock.writeLock().unlock();
-      try {
-        type = loadRaw(pgType, pgAttrs);
-      }
-      finally {
-        lock.writeLock().lock();
-      }
-
-      if (type != null) {
-        oidMap.put(typeId, type);
-        nameMap.put(type.getName(), type);
-        relIdMap.put(type.getRelationId(), type);
-      }
-
-      return type;
+    if (type != null) {
+      oidMap.put(typeId, type);
+      nameMap.put(type.getName(), type);
+      relIdMap.put(type.getRelationId(), type);
     }
-    finally {
-      lock.writeLock().unlock();
-    }
+
+    return type;
   }
 
   /*
    * Materialize the requested type from the raw catalog data
+   *
+   * This method MUST be called with a WRITE lock
    */
-  private CompositeType loadRelationRaw(int relationId) {
+  private CompositeType loadRelationRaw(int relationId, Context context) {
 
     if (relationId == 0)
       return null;
 
-    lock.writeLock().lock();
-    try {
+    CompositeType type = null;
 
-      CompositeType type = null;
+    Collection<PgAttribute.Row> pgAttrs = pgAttrData.get(relationId);
+    if (pgAttrs != null && !pgAttrs.isEmpty()) {
 
-      Collection<PgAttribute.Row> pgAttrs = pgAttrData.get(relationId);
-      if (pgAttrs != null && !pgAttrs.isEmpty()) {
+      PgType.Row pgType = pgTypeData.get(pgAttrs.iterator().next().relationTypeId);
+      if (pgType == null)
+        return null;
 
-        PgType.Row pgType = pgTypeData.get(pgAttrs.iterator().next().relationTypeId);
-        if (pgType == null)
-          return null;
+      type = (CompositeType) loadRaw(pgType, pgAttrs, context);
 
-        lock.writeLock().unlock();
-        try {
-          type = (CompositeType) loadRaw(pgType, pgAttrs);
-        }
-        finally {
-          lock.writeLock().lock();
-        }
-
-        if (type != null) {
-          oidMap.put(pgType.oid, type);
-          nameMap.put(type.getName(), type);
-          relIdMap.put(type.getRelationId(), type);
-        }
+      if (type != null) {
+        oidMap.put(pgType.oid, type);
+        nameMap.put(type.getName(), type);
+        relIdMap.put(type.getRelationId(), type);
       }
-
-      return type;
-    }
-    finally {
-      lock.writeLock().unlock();
     }
 
+    return type;
   }
 
   /*
    * Materialize a type from the given "pg_type" and "pg_attribute" data
    */
-  private Type loadRaw(PgType.Row pgType, Collection<PgAttribute.Row> pgAttrs) {
+  private Type loadRaw(PgType.Row pgType, Collection<PgAttribute.Row> pgAttrs, Context context) {
 
     Type type;
 
     if (pgType.elementTypeId != 0 && pgType.category.equals("A")) {
 
       ArrayType array = new ArrayType();
-      array.setElementType(loadType(pgType.elementTypeId));
+      array.setElementType(loadType(pgType.elementTypeId, context));
 
       type = array;
     }
@@ -525,7 +531,7 @@ public class Registry {
         lock.writeLock().unlock();
       }
 
-      type.load(pgType, pgAttrs, this);
+      type.load(pgType, pgAttrs, this, context);
 
     }
     catch (Exception e) {
@@ -549,20 +555,21 @@ public class Registry {
    *
    * @param encoderId proc-id of the encoder
    * @param decoderId proc-id of the decoder
+   * @param context The context
    * @return A matching Codec instance
    */
-  public Codec loadCodec(int encoderId, int decoderId, Format format) {
+  public Codec loadCodec(int encoderId, int decoderId, Format format, Context context) {
 
     Codec io = new Codec();
-    io.decoder = loadDecoderProc(decoderId, procs.getDefaultDecoder(format));
-    io.encoder = loadEncoderProc(encoderId, procs.getDefaultEncoder(format));
+    io.decoder = loadDecoderProc(decoderId, procs.getDefaultDecoder(format), context);
+    io.encoder = loadEncoderProc(encoderId, procs.getDefaultEncoder(format), context);
     return io;
   }
 
   /*
    * Loads a matching encoder given its proc-id
    */
-  private Codec.Encoder loadEncoderProc(int procId, Codec.Encoder defaultEncoder) {
+  private Codec.Encoder loadEncoderProc(int procId, Codec.Encoder defaultEncoder, Context context) {
 
     String name = lookupProcName(procId);
     if (name == null) {
@@ -575,7 +582,7 @@ public class Registry {
   /*
    * Loads a matching decoder given its proc-id
    */
-  private Codec.Decoder loadDecoderProc(int procId, Codec.Decoder defaultDecoder) {
+  private Codec.Decoder loadDecoderProc(int procId, Codec.Decoder defaultDecoder, Context context) {
 
     String name = lookupProcName(procId);
     if (name == null) {
@@ -588,7 +595,7 @@ public class Registry {
   /*
    * Loads a matching parser given mod-in and mod-out ids
    */
-  public Modifiers.Parser loadModifierParser(int modInId, int modOutId) {
+  public Modifiers.Parser loadModifierParser(int modInId, int modOutId, Context context) {
 
     String name = lookupProcName(modInId);
     if (name == null) {

@@ -86,7 +86,7 @@ public class Arrays extends SimpleProcProvider {
 
         int dimensionCount = buffer.readInt();
         /* boolean hasNulls = */ buffer.readInt() /* == 1 ? true : false */;
-        Type elementType = context.getRegistry().loadType(buffer.readInt());
+        Type elementType = context.getRegistry().loadType(buffer.readInt(), context);
 
         //Each Dimension
         int[] dimensions = new int[dimensionCount];

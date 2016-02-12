@@ -141,7 +141,7 @@ public class IntervalTest {
   public void testIntervalToStringCoercion() throws SQLException {
     Interval interval = new Interval("1 year 3 months");
     PGConnectionImpl pgConnectionImpl = _conn.unwrap(PGConnectionImpl.class);
-    Type type = pgConnectionImpl.getRegistry().loadType("Interval");
+    Type type = pgConnectionImpl.getRegistry().loadType("Interval", pgConnectionImpl);
     String coercedStringValue = SQLTypeUtils.coerceToString(interval, type, pgConnectionImpl);
 
     assertEquals("@ 1 years 3 months 0 days 0 hours 0 minutes 0.00 seconds", coercedStringValue);

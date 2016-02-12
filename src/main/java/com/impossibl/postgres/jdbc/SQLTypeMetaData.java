@@ -28,6 +28,7 @@
  */
 package com.impossibl.postgres.jdbc;
 
+import com.impossibl.postgres.system.Context;
 import com.impossibl.postgres.types.CompositeType;
 import com.impossibl.postgres.types.DomainType;
 import com.impossibl.postgres.types.PrimitiveType;
@@ -150,51 +151,51 @@ class SQLTypeMetaData {
     return type.unwrap().getCategory() == Type.Category.Numeric;
   }
 
-  public static Type getType(int sqlType, Registry reg) {
+  public static Type getType(int sqlType, Registry reg, Context context) {
 
     switch (sqlType) {
       case Types.BOOLEAN:
       case Types.BIT:
-        return reg.loadType("bool");
+        return reg.loadType("bool", context);
       case Types.SMALLINT:
-        return reg.loadType("int2");
+        return reg.loadType("int2", context);
       case Types.INTEGER:
-        return reg.loadType("int4");
+        return reg.loadType("int4", context);
       case Types.BIGINT:
-        return reg.loadType("int8");
+        return reg.loadType("int8", context);
       case Types.REAL:
-        return reg.loadType("float4");
+        return reg.loadType("float4", context);
       case Types.FLOAT:
       case Types.DOUBLE:
-        return reg.loadType("float8");
+        return reg.loadType("float8", context);
       case Types.NUMERIC:
       case Types.DECIMAL:
-        return reg.loadType("numeric");
+        return reg.loadType("numeric", context);
       case Types.CHAR:
       case Types.VARCHAR:
       case Types.LONGVARCHAR:
-        return reg.loadType("text");
+        return reg.loadType("text", context);
       case Types.TIME:
-        return reg.loadType("time");
+        return reg.loadType("time", context);
       case Types.DATE:
-        return reg.loadType("date");
+        return reg.loadType("date", context);
       case Types.TIMESTAMP:
-        return reg.loadType("timestamp");
+        return reg.loadType("timestamp", context);
       case Types.BINARY:
       case Types.VARBINARY:
       case Types.LONGVARBINARY:
-        return reg.loadType("bytea");
+        return reg.loadType("bytea", context);
       case Types.ARRAY:
-        return reg.loadType("anyarray");
+        return reg.loadType("anyarray", context);
       case Types.BLOB:
       case Types.CLOB:
-        return reg.loadType("oid");
+        return reg.loadType("oid", context);
       case Types.DISTINCT:
         return null;
       case Types.STRUCT:
-        return reg.loadType("oid");
+        return reg.loadType("oid", context);
       case Types.ROWID:
-        return reg.loadType("tid");
+        return reg.loadType("tid", context);
       case Types.TINYINT:
       case Types.REF:
       case Types.OTHER:

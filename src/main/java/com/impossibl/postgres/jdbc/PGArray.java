@@ -129,7 +129,7 @@ public class PGArray implements Array {
     Type elementType = getDimensions(value) > 1 ? type : type.getElementType();
 
     ResultField[] fields = {
-      new ResultField("INDEX", 0, (short)0, reg.loadType("int4"), (short)0, 0, Format.Binary),
+      new ResultField("INDEX", 0, (short)0, reg.loadType("int4", connection), (short)0, 0, Format.Binary),
       new ResultField("VALUE", 0, (short)0, elementType, (short)0, 0, Format.Binary)
     };
 

@@ -958,7 +958,7 @@ public class ProtocolImpl implements Protocol {
     for (int c = 0; c < paramCount; ++c) {
 
       int paramTypeId = buffer.readInt();
-      paramTypes[c] = TypeRef.from(paramTypeId, context.getRegistry());
+      paramTypes[c] = TypeRef.from(paramTypeId, context.getRegistry(), context);
     }
 
     logger.finest("PARAM-DESC: " + paramCount);
@@ -982,7 +982,7 @@ public class ProtocolImpl implements Protocol {
       field.name = readCString(buffer, context.getCharset());
       field.relationId = buffer.readInt();
       field.relationAttributeNumber = buffer.readShort();
-      field.typeRef = TypeRef.from(buffer.readInt(), registry);
+      field.typeRef = TypeRef.from(buffer.readInt(), registry, context);
       field.typeLength = buffer.readShort();
       field.typeModifier = buffer.readInt();
       field.format = ResultField.Format.values()[buffer.readShort()];

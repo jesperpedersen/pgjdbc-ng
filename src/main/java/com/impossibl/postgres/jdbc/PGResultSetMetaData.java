@@ -83,7 +83,7 @@ class PGResultSetMetaData implements ResultSetMetaData {
     if (field.relationId == 0)
       return null;
 
-    return connection.getRegistry().loadRelationType(field.relationId);
+    return connection.getRegistry().loadRelationType(field.relationId, connection);
   }
 
   /**
@@ -97,7 +97,7 @@ class PGResultSetMetaData implements ResultSetMetaData {
 
     ResultField field = get(columnIndex);
 
-    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId);
+    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId, connection);
     if (relType == null)
       return null;
 
@@ -127,7 +127,7 @@ class PGResultSetMetaData implements ResultSetMetaData {
   public boolean isAutoIncrement(int column) throws SQLException {
 
     ResultField field = get(column);
-    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId);
+    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId, connection);
 
     return SQLTypeMetaData.isAutoIncrement(field.typeRef.get(), relType, field.relationAttributeNumber);
   }
@@ -153,7 +153,7 @@ class PGResultSetMetaData implements ResultSetMetaData {
   public int isNullable(int column) throws SQLException {
 
     ResultField field = get(column);
-    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId);
+    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId, connection);
 
     return SQLTypeMetaData.isNullable(field.typeRef.get(), relType, field.relationAttributeNumber);
   }
@@ -230,7 +230,7 @@ class PGResultSetMetaData implements ResultSetMetaData {
   public String getColumnTypeName(int column) throws SQLException {
 
     ResultField field = get(column);
-    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId);
+    CompositeType relType = connection.getRegistry().loadRelationType(field.relationId, connection);
 
     return SQLTypeMetaData.getTypeName(field.typeRef.get(), relType, field.relationAttributeNumber);
   }

@@ -326,8 +326,9 @@ public abstract class Type {
    * @param source The "pg_type" table entry
    * @param attrs Associated "pg_attribute" table entries, if available.
    * @param registry The registry that is loading the type.
+   * @param context The context
    */
-  public void load(PgType.Row source, Collection<PgAttribute.Row> attrs, Registry registry) {
+  public void load(PgType.Row source, Collection<PgAttribute.Row> attrs, Registry registry, Context context) {
 
     id = source.oid;
     name = source.name;
@@ -339,10 +340,10 @@ public abstract class Type {
     arrayTypeId = source.arrayTypeId;
     relationId = source.relationId;
     codecs = new Codec[] {
-        registry.loadCodec(source.inputId, source.outputId, Format.Text),
-        registry.loadCodec(source.receiveId, source.sendId, Format.Binary),
+      registry.loadCodec(source.inputId, source.outputId, Format.Text, context),
+      registry.loadCodec(source.receiveId, source.sendId, Format.Binary, context),
     };
-    modifierParser = registry.loadModifierParser(source.modInId, source.modOutId);
+    modifierParser = registry.loadModifierParser(source.modInId, source.modOutId, context);
   }
 
   /**

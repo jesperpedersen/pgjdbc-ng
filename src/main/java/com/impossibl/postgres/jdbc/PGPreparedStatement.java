@@ -139,7 +139,7 @@ class PGPreparedStatement extends PGStatement implements PreparedStatement {
 
     if (paramType == null || targetSQLType != getSQLType(paramType)) {
 
-      paramType = SQLTypeMetaData.getType(targetSQLType, connection.getRegistry());
+      paramType = SQLTypeMetaData.getType(targetSQLType, connection.getRegistry(), connection);
 
       parameterTypes.set(parameterIdx, paramType);
 

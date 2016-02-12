@@ -29,6 +29,7 @@
 package com.impossibl.postgres.types;
 
 import com.impossibl.postgres.protocol.ResultField.Format;
+import com.impossibl.postgres.system.Context;
 import com.impossibl.postgres.system.tables.PgAttribute;
 import com.impossibl.postgres.system.tables.PgType;
 
@@ -68,11 +69,11 @@ public class RangeType extends Type {
   }
 
   @Override
-  public void load(PgType.Row source, Collection<PgAttribute.Row> attrs, Registry registry) {
+  public void load(PgType.Row source, Collection<PgAttribute.Row> attrs, Registry registry, Context context) {
 
-    super.load(source, attrs, registry);
+    super.load(source, attrs, registry, context);
 
-    base = registry.loadType(source.rangeBaseTypeId);
+    base = registry.loadType(source.rangeBaseTypeId, context);
   }
 
 }

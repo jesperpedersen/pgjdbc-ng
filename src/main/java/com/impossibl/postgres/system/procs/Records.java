@@ -85,7 +85,7 @@ public class Records extends SimpleProcProvider {
 
           Attribute attribute = compType.getAttribute(c + 1);
 
-          Type attributeType = context.getRegistry().loadType(buffer.readInt());
+          Type attributeType = context.getRegistry().loadType(buffer.readInt(), context);
 
           if (attributeType.getId() != attribute.type.getId()) {
 

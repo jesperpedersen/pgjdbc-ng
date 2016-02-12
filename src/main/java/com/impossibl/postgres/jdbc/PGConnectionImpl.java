@@ -1146,7 +1146,7 @@ public class PGConnectionImpl extends BasicContext implements PGConnection {
   public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
     checkClosed();
 
-    Type type = getRegistry().loadType(typeName + "[]");
+    Type type = getRegistry().loadType(typeName + "[]", this);
     if (type == null) {
       throw new SQLException("Array type not found");
     }
@@ -1158,7 +1158,7 @@ public class PGConnectionImpl extends BasicContext implements PGConnection {
   public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
     checkClosed();
 
-    Type type = getRegistry().loadType(typeName);
+    Type type = getRegistry().loadType(typeName, this);
     if (!(type instanceof CompositeType)) {
       throw new SQLException("Invalid type for struct");
     }
